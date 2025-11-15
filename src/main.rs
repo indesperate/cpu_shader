@@ -1,19 +1,26 @@
 use std::error::Error;
 use std::io::BufWriter;
+use std::sync::Arc;
 use std::{fs, io::Write};
 
 use glam::{Vec2, Vec2Swizzles, Vec4};
 
-fn write_image(time_point: i32) -> Result<(), Box<dyn Error>> {
-    let output_path = format!("output_{:02}.ppm", time_point);
+struct Resolution {
+    w: i32,
+    h: i32,
+    fps: i32,
+}
+
+fn write_image(frame: i32, res: &Resolution) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let output_path = format!("output_{:02}.ppm", frame);
     let file = fs::File::create(output_path)?;
     let mut f = BufWriter::new(file);
-    let w = 512 * 4;
-    let h = 256 * 4;
+    let w = res.w;
+    let h = res.h;
     writeln!(f, "P6")?;
     writeln!(f, "{} {}", w, h)?;
     writeln!(f, "255")?;
-    let t = time_point as f32 / 60.0;
+    let t = frame as f32 / res.fps as f32;
     let r = Vec2::new(w as f32, h as f32);
     for y in (0..h).rev() {
         for x in 0..w {
@@ -39,9 +46,26 @@ fn write_image(time_point: i32) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    for time_point in 0..60 {
-        write_image(time_point)?;
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+    let mut handles = Vec::new();
+
+    let seconds = 8;
+
+    let res = Arc::new(Resolution {
+        w: 1920,
+        h: 1080,
+        fps: 60,
+    });
+
+    for time_point in 0..(seconds * res.fps) {
+        let res_cloned = Arc::clone(&res);
+        let handle = tokio::task::spawn_blocking(move || write_image(time_point, &res_cloned));
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.await??;
     }
     Ok(())
 }
