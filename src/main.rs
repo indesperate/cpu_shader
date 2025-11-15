@@ -58,9 +58,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         fps: 60,
     });
 
-    for time_point in 0..(seconds * res.fps) {
+    for frame in 0..(seconds * res.fps) {
         let res_cloned = Arc::clone(&res);
-        let handle = tokio::task::spawn_blocking(move || write_image(time_point, &res_cloned));
+        let handle = tokio::task::spawn_blocking(move || write_image(frame, &res_cloned));
         handles.push(handle);
     }
 
