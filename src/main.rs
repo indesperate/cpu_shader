@@ -3,7 +3,7 @@ use std::io::BufWriter;
 use std::sync::Arc;
 use std::{fs, io::Write};
 
-use glam::{Vec2, Vec2Swizzles, Vec4};
+use glam::{Vec2, Vec2Swizzles, Vec4, vec2, vec4};
 
 struct Resolution {
     w: i32,
@@ -21,24 +21,23 @@ fn write_image(frame: i32, res: &Resolution) -> Result<(), Box<dyn Error + Send 
     writeln!(f, "{} {}", w, h)?;
     writeln!(f, "255")?;
     let t = frame as f32 / res.fps as f32;
-    let r = Vec2::new(w as f32, h as f32);
+    let r = vec2(w as f32, h as f32);
+    let wt = vec4(-1., 1., 2., 0.);
     for y in (0..h).rev() {
         for x in 0..w {
-            let mut o = Vec4::default();
-            let fc = Vec2::new(x as f32, y as f32);
+            let mut o = Vec4::ZERO;
+            let fc = vec2(x as f32, y as f32);
             let p = (fc * 2. - r) / r.y;
-            let mut l = Vec2::default();
-            let mut i = Vec2::default();
-            let wt = Vec4::new(-1., 1., 2., 0.);
-            l += 4. - 4. * (0.7 - p.dot(p)).abs();
+            let l = Vec2::splat(4. - 4. * (0.7 - p.dot(p)).abs());
+            let mut i = Vec2::ZERO;
             let mut v = p * l;
-            while i.y < 8. {
+            for _ in 0..8 {
                 i.y += 1.;
                 v += (v.yx() * i.y + i + t).map(|x| x.cos()) / i.y + 0.7;
                 o += (v.xyyx().map(|x| x.sin()) + 1.) * (v.x - v.y).abs();
             }
             o = (5. * (l.x - 4. - wt * p.y).map(|x| x.exp()) / o).map(|x| x.tanh());
-            let color: &[u8; 3] = &[(o.x * 255.) as u8, (o.y * 255.) as u8, (o.z * 255.) as u8];
+            let color = &[(o.x * 255.) as u8, (o.y * 255.) as u8, (o.z * 255.) as u8];
             f.write(color)?;
         }
     }
